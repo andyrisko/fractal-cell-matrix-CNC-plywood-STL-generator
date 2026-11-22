@@ -1,0 +1,1135 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Cell Studio â€” Fractal Matrix & Plywood STL</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #080e15; color: #deebf6; font: 11.5px/1.35 system-ui, -apple-system, sans-serif; }
+  main { height: 100dvh; display: grid; grid-template-columns: 276px 1fr; }
+  aside { padding: 12px 14px; overflow-y: auto; background: #142231; border-right: 1px solid #23384e; }
+  h1 { font-size: 16px; margin: 0 0 4px 0; color: #fff; letter-spacing: 0.2px; }
+  h2 { font-size: 11px; text-transform: uppercase; letter-spacing: 0.6px; margin: 12px 0 5px 0; padding-top: 9px; border-top: 1px solid #263d54; color: #65dfbe; }
+  label { display: block; margin-top: 7px; cursor: pointer; color: #c7d9e8; }
+  input[type=range] { width: 100%; height: 14px; margin: 2px 0 0 0; accent-color: #65dfbe; cursor: pointer; }
+  button, select, input[type=number] {
+    width: 100%; padding: 5px 7px; background: #1d3347; color: #fff;
+    border: 1px solid #355069; border-radius: 4px; margin-top: 3px; font-size: 11.5px;
+  }
+  button { cursor: pointer; font-weight: 500; transition: background 0.12s; }
+  button:hover { background: #284561; }
+  button.primary { background: #1a6653; border-color: #2c967b; }
+  button.primary:hover { background: #228068; }
+  output { float: right; color: #65dfbe; font-variant-numeric: tabular-nums; font-weight: 600; }
+  p, small { color: #8fa9be; font-size: 11px; margin: 4px 0; }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 5px; }
+  .chk-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 6px; margin-top: 7px; }
+  .chk-grid label { margin-top: 0; display: flex; align-items: center; gap: 5px; font-size: 11px; }
+  .chk-grid input[type=checkbox] { margin: 0; accent-color: #65dfbe; }
+
+  section { padding: 8px 12px; display: flex; flex-direction: column; min-width: 0; gap: 6px; background: #0a1119; }
+  .topbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .tabs { display: flex; gap: 5px; }
+  .tab { width: auto; margin: 0; padding: 5px 12px; background: #162636; border: 1px solid #2b445c; color: #9eb7ca; border-radius: 4px; }
+  .tab.active { background: #1f4b5e; border-color: #65dfbe; color: #fff; }
+  #status { font-size: 11.5px; color: #9eb7ca; font-variant-numeric: tabular-nums; }
+
+  .progress-wrap { width: 100%; height: 4px; background: #162534; border-radius: 2px; overflow: hidden; }
+  .progress-fill { height: 100%; width: 0%; background: linear-gradient(90deg, #2c967b, #65dfbe); transition: width 0.08s linear; }
+
+  #stage { flex: 1; min-height: 0; position: relative; display: flex; align-items: center; justify-content: center; background: radial-gradient(circle at center, #111d2b 0%, #070c12 100%); border: 1px solid #1b2c3d; border-radius: 6px; overflow: hidden; }
+  #canvas2d { max-width: 100%; max-height: 100%; aspect-ratio: 1; box-shadow: 0 8px 28px rgba(0,0,0,0.6); background: #000; display: none; }
+  #glCanvas { width: 100%; height: 100%; display: block; cursor: grab; }
+  #glCanvas:active { cursor: grabbing; }
+  .hint { position: absolute; bottom: 8px; right: 10px; background: rgba(10,17,25,0.78); padding: 4px 8px; border-radius: 4px; border: 1px solid #253b50; font-size: 10.5px; color: #9eb7ca; pointer-events: none; }
+  #error { white-space: pre-wrap; color: #ff879b; font-size: 10.5px; margin-top: 6px; }
+</style>
+</head>
+<body>
+<main>
+  <aside>
+    <h1>Cell Studio / Fractal</h1>
+    <p>1024 Ã— 1024 progressive fractal cell matrix &amp; CNC plywood STL generator.</p>
+
+    <div class="row2">
+      <label>Random Seed<input id="seed" type="number" value="443805"></label>
+      <label style="display:flex;flex-direction:column;justify-content:flex-end;">
+        <button id="newSeed" style="margin-top:0;">New Seed</button>
+      </label>
+    </div>
+
+    <div id="controls"></div>
+
+    <h2>Shading &amp; Falloff</h2>
+    <div class="row2">
+      <label>Gradient Dir
+        <select id="direction">
+          <option value="dark">Dark core â†’ Light wall</option>
+          <option value="bright">Light core â†’ Dark wall</option>
+        </select>
+      </label>
+      <label>Falloff Curve
+        <select id="falloff">
+          <option value="smoothstep">Smoothstep</option>
+          <option value="linear">Linear</option>
+          <option value="cosine">Cosine</option>
+          <option value="invCosine">Inverse Cosine</option>
+          <option value="quadratic">Quadratic (Dome)</option>
+          <option value="invQuadratic">Inv Quadratic (Spike)</option>
+          <option value="halfSine">Half-Sine</option>
+        </select>
+      </label>
+    </div>
+
+    <div class="chk-grid">
+      <label><input id="showMembrane" type="checkbox" checked> Cell Walls</label>
+      <label><input id="gradient" type="checkbox" checked> Gradient</label>
+      <label><input id="markers" type="checkbox"> Core Centers</label>
+      <label><input id="bounds" type="checkbox"> Dotted Walls</label>
+    </div>
+
+    <h2>3D Plywood Preview</h2>
+    <div class="row2">
+      <label>Plywood Style
+        <select id="plyStyle">
+          <option value="birch" selected>Baltic Birch</option>
+          <option value="walnut">Walnut &amp; Maple</option>
+          <option value="spectra">Dyed Spectra Ply</option>
+          <option value="solid">Solid Matte</option>
+        </select>
+      </label>
+      <label>Ply Layers<output id="plyLayersOut">11</output>
+        <input type="range" id="plyLayers" min="3" max="25" value="11" step="1">
+      </label>
+    </div>
+
+    <h2>3D STL Export &amp; Frame</h2>
+    <div class="row3">
+      <label>Width (mm)<input id="stlSize" type="number" value="100" min="10" max="500" step="5"></label>
+      <label>Base (mm)<input id="stlBase" type="number" value="2.0" min="0.2" max="50" step="0.2"></label>
+      <label>Relief (mm)<input id="stlHeight" type="number" value="4.5" min="0.1" max="100" step="0.2"></label>
+    </div>
+
+    <div class="row2">
+      <label>Frame Type
+        <select id="frameType">
+          <option value="none">No Frame</option>
+          <option value="raised" selected>Raised Rim</option>
+          <option value="recessed">Recessed Rim</option>
+        </select>
+      </label>
+      <label>Rim Width (mm)<input id="frameWidth" type="number" value="4.0" min="0.5" max="40" step="0.5"></label>
+    </div>
+
+    <div class="row2">
+      <label>Smooth<output id="stlSmoothOut">3</output>
+        <input type="range" id="stlSmooth" min="0" max="10" value="3" step="1">
+      </label>
+      <label>STL Mesh
+        <select id="stlRes">
+          <option value="256">256 Ã— 256</option>
+          <option value="512" selected>512 Ã— 512</option>
+          <option value="1024">1024 Ã— 1024</option>
+        </select>
+      </label>
+    </div>
+
+    <button id="exportStl" class="primary" style="margin-top:8px;">Export Binary STL (3D)</button>
+    <div class="row2" style="margin-top:5px;">
+      <button id="exportPng">Export PNG</button>
+      <button id="full">Fullscreen</button>
+    </div>
+
+    <div id="error"></div>
+  </aside>
+
+  <section>
+    <div class="topbar">
+      <div class="tabs">
+        <button class="tab active" id="tab3d">3D Plywood Preview</button>
+        <button class="tab" id="tab2d">2D Matrix</button>
+      </div>
+      <div id="status">Initializingâ€¦</div>
+    </div>
+    <div class="progress-wrap"><div class="progress-fill" id="progressBar"></div></div>
+    <div id="stage">
+      <canvas id="glCanvas"></canvas>
+      <canvas id="canvas2d" width="1024" height="1024"></canvas>
+      <div class="hint" id="glHint">Left drag: Rotate â€¢ Right/Shift drag: Pan â€¢ Wheel: Zoom</div>
+    </div>
+  </section>
+</main>
+
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+const N = 1024, L = N * N;
+
+// 2D Buffers
+const c2d = $('canvas2d'), ctx = c2d.getContext('2d');
+let imgData = ctx.createImageData(N, N);
+let labels = new Int32Array(L);
+let distance = new Float32Array(L);
+let coordinate = new Float32Array(L);
+let heightBuffer = new Float32Array(L);
+let regions = [];
+
+// Progressive stage settings
+const STAGES = [128, 256, 512, 1024];
+let jobId = 0;
+let stageTimer = null;
+let currentView = '3d';
+let lastPreviewGrid = null;
+let lastPreviewRes = 0;
+
+function addRange(id, name, min, max, val, step = 1) {
+  let d = document.createElement('div');
+  d.innerHTML = `<label>${name}<output id="${id}out">${val}</output></label><input type="range" id="${id}" min="${min}" max="${max}" value="${val}" step="${step}">`;
+  $('controls').append(d);
+  $(id).oninput = () => {
+    $(id + 'out').textContent = $(id).value;
+    if (id === 'core') {
+      shade();
+      refreshViews(true);
+    } else {
+      startProgressive(true);
+    }
+  };
+  $(id).onchange = () => {
+    if (id !== 'core') startProgressive(false);
+  };
+}
+
+addRange('cells', 'Initial Cell Count', 4, 180, 35);
+addRange('octaves', 'Fractal Octaves', 1, 8, 5);
+addRange('rough', 'Fractal Roughness', 0.15, 0.85, 0.5, 0.01);
+addRange('scale', 'Noise Base Scale (px)', 50, 700, 300);
+addRange('warp', 'Fractal Warp (px)', 0, 150, 55);
+addRange('membrane', 'Wall Width (px)', 1, 14, 4);
+addRange('core', 'Core Area (%)', 0, 90, 25);
+
+const V = id => +$(id).value;
+let seed = 1;
+
+function rnd() {
+  seed = (Math.imul(seed, 1664525) + 1013904223) | 0;
+  return (seed >>> 0) / 4294967296;
+}
+
+function hash(x, y, s) {
+  let h = Math.imul(x, 374761393) ^ Math.imul(y, 668265263) ^ s;
+  h = Math.imul(h ^ (h >>> 13), 1274126177);
+  return ((h ^ (h >>> 16)) >>> 0) / 4294967295;
+}
+
+function noise(x, y, s) {
+  let ix = Math.floor(x), iy = Math.floor(y), u = x - ix, v = y - iy;
+  u = u * u * (3 - 2 * u);
+  v = v * v * (3 - 2 * v);
+  let a = hash(ix, iy, s), b = hash(ix + 1, iy, s);
+  let d = hash(ix, iy + 1, s), e = hash(ix + 1, iy + 1, s);
+  return (a + (b - a) * u) * (1 - v) + (d + (e - d) * u) * v;
+}
+
+function fbm(x, y, s) {
+  let a = 1, sum = 0, norm = 0;
+  const oct = V('octaves'), rough = V('rough');
+  for (let o = 0; o < oct; o++) {
+    sum += a * (noise(x, y, s + o * 104729) * 2 - 1);
+    norm += a;
+    a *= rough;
+    x *= 2.03;
+    y *= 2.03;
+  }
+  return sum / norm;
+}
+
+function setProgress(pct, text) {
+  $('progressBar').style.width = `${Math.max(0, Math.min(100, pct))}%`;
+  if (text) $('status').textContent = text;
+}
+
+// Compute at resolution M (128, 256, 512, or 1024) and upscale cleanly to 1024x1024
+function computeStage(M) {
+  const step = N / M;
+  const ML = M * M;
+  seed = +$('seed').value | 0;
+  let sd = seed, sites = [], count = V('cells'), grid = Math.ceil(Math.sqrt(count));
+  const rows = Math.ceil(count / grid);
+  for (let i = 0; i < count; i++) {
+    let row = (i / grid) | 0, col = i % grid;
+    sites.push([
+      (col + 0.15 + 0.7 * rnd()) / grid * N,
+      (row + 0.15 + 0.7 * rnd()) / rows * N
+    ]);
+  }
+
+  let owner = new Int32Array(ML);
+  const scale = V('scale'), amp = V('warp');
+  for (let my = 0; my < M; my++) {
+    const y = my * step;
+    for (let mx = 0; mx < M; mx++) {
+      const x = mx * step;
+      const xx = x + fbm(x / scale, y / scale, sd) * amp;
+      const yy = y + fbm(x / scale + 39.2, y / scale - 17.6, sd ^ 93847) * amp;
+      let best = Infinity, id = 0;
+      for (let j = 0; j < sites.length; j++) {
+        const dx = xx - sites[j][0], dy = yy - sites[j][1];
+        const d = dx * dx + dy * dy;
+        if (d < best) { best = d; id = j; }
+      }
+      owner[my * M + mx] = id;
+    }
+  }
+
+  let mLabels = new Int32Array(ML).fill(-1);
+  let mRegs = [];
+  let queue = new Int32Array(ML);
+  for (let s = 0; s < ML; s++) {
+    if (mLabels[s] >= 0) continue;
+    let id = mRegs.length, head = 0, tail = 1, source = owner[s], sx = 0, sy = 0;
+    queue[0] = s;
+    mLabels[s] = id;
+    while (head < tail) {
+      let i = queue[head++], mx = i % M, my = (i / M) | 0;
+      sx += mx; sy += my;
+      if (mx > 0 && mLabels[i - 1] < 0 && owner[i - 1] === source) { mLabels[i - 1] = id; queue[tail++] = i - 1; }
+      if (mx < M - 1 && mLabels[i + 1] < 0 && owner[i + 1] === source) { mLabels[i + 1] = id; queue[tail++] = i + 1; }
+      if (my > 0 && mLabels[i - M] < 0 && owner[i - M] === source) { mLabels[i - M] = id; queue[tail++] = i - M; }
+      if (my < M - 1 && mLabels[i + M] < 0 && owner[i + M] === source) { mLabels[i + M] = id; queue[tail++] = i + M; }
+    }
+    mRegs.push({ id, area: tail, cx: sx / tail, cy: sy / tail, near: Infinity, center: s });
+  }
+
+  let mDist = new Float32Array(ML);
+  for (let my = 0; my < M; my++) {
+    for (let mx = 0; mx < M; mx++) {
+      let i = my * M + mx, id = mLabels[i];
+      let isEdge = mx === 0 || my === 0 || mx === M - 1 || my === M - 1 ||
+                   mLabels[i - 1] !== id || mLabels[i + 1] !== id ||
+                   mLabels[i - M] !== id || mLabels[i + M] !== id;
+      mDist[i] = isEdge ? 0 : 1e9;
+      let r = mRegs[id], d = (mx - r.cx) ** 2 + (my - r.cy) ** 2;
+      if (d < r.near) { r.near = d; r.center = i; }
+    }
+  }
+
+  const diag = Math.SQRT2;
+  for (let my = 0; my < M; my++) {
+    for (let mx = 0; mx < M; mx++) {
+      let i = my * M + mx, d = mDist[i];
+      if (mx) d = Math.min(d, mDist[i - 1] + 1);
+      if (my) d = Math.min(d, mDist[i - M] + 1);
+      if (mx && my) d = Math.min(d, mDist[i - M - 1] + diag);
+      if (mx < M - 1 && my) d = Math.min(d, mDist[i - M + 1] + diag);
+      mDist[i] = d;
+    }
+  }
+  for (let my = M - 1; my >= 0; my--) {
+    for (let mx = M - 1; mx >= 0; mx--) {
+      let i = my * M + mx, d = mDist[i];
+      if (mx < M - 1) d = Math.min(d, mDist[i + 1] + 1);
+      if (my < M - 1) d = Math.min(d, mDist[i + M] + 1);
+      if (mx < M - 1 && my < M - 1) d = Math.min(d, mDist[i + M + 1] + diag);
+      if (mx && my < M - 1) d = Math.min(d, mDist[i + M - 1] + diag);
+      mDist[i] = d;
+    }
+  }
+
+  // Upscale to 1024x1024 full buffers
+  if (M === N) {
+    labels.set(mLabels);
+    distance.set(mDist);
+    regions = mRegs;
+  } else {
+    const shift = Math.log2(step) | 0;
+    for (let y = 0; y < N; y++) {
+      const my = y >> shift;
+      const rowOff = y * N;
+      const mRowOff = my * M;
+      for (let x = 0; x < N; x++) {
+        const mx = x >> shift;
+        const mi = mRowOff + mx;
+        labels[rowOff + x] = mLabels[mi];
+        distance[rowOff + x] = mDist[mi] * step;
+      }
+    }
+    regions = mRegs.map(r => ({
+      id: r.id,
+      area: r.area * step * step,
+      cx: r.cx * step,
+      cy: r.cy * step,
+      near: Infinity,
+      center: ((r.center / M) | 0) * step * N + (r.center % M) * step
+    }));
+  }
+
+  computeCoordinates();
+  shade();
+}
+
+function computeCoordinates() {
+  if (!regions.length) return;
+  let showMem = $('showMembrane').checked;
+  let width = showMem ? V('membrane') / 2 : 0;
+
+  for (let r of regions) {
+    r.near = Infinity; r.maxD = -1; r.fallback = r.center;
+  }
+  for (let i = 0; i < L; i++) {
+    let r = regions[labels[i]];
+    if (!r) continue;
+    let x = i % N, y = (i / N) | 0;
+    if (distance[i] > r.maxD) { r.maxD = distance[i]; r.fallback = i; }
+    let d = (x - r.cx) ** 2 + (y - r.cy) ** 2;
+    if (distance[i] > width + 1 && d < r.near) { r.near = d; r.center = i; }
+  }
+  for (let r of regions) {
+    if (r.near === Infinity) r.center = r.fallback;
+    r.x = r.center % N;
+    r.y = (r.center / N) | 0;
+    r.visible = r.maxD > width;
+  }
+  for (let i = 0; i < L; i++) {
+    let r = regions[labels[i]];
+    if (!r) continue;
+    let dc = Math.hypot((i % N) - r.x, ((i / N) | 0) - r.y);
+    let db = Math.max(0, distance[i] - width);
+    coordinate[i] = (dc + db > 0) ? dc / (dc + db) : 0;
+  }
+}
+
+function applyFalloff(t, mode) {
+  if (mode === 'smoothstep') return t * t * (3 - 2 * t);
+  if (mode === 'cosine') return 0.5 - 0.5 * Math.cos(Math.PI * t);
+  if (mode === 'invCosine') return Math.acos(1 - 2 * t) / Math.PI;
+  if (mode === 'quadratic') return t * t;
+  if (mode === 'invQuadratic') return 1 - (1 - t) * (1 - t);
+  if (mode === 'halfSine') return Math.sin(t * Math.PI * 0.5);
+  return t; // linear
+}
+
+function shade() {
+  let dir = $('direction').value;
+  let falloff = $('falloff').value;
+  let useGrad = $('gradient').checked;
+  let showMem = $('showMembrane').checked;
+  let dotted = $('bounds').checked;
+  let coreFrac = V('core') / 100;
+  let width = showMem ? V('membrane') / 2 : 0;
+  let data = imgData.data;
+
+  for (let i = 0; i < L; i++) {
+    let x = i % N, y = (i / N) | 0;
+    let isMem = showMem && (distance[i] <= width);
+    let val = 0;
+
+    if (isMem) {
+      val = (dotted && (((x >> 2) + (y >> 2)) & 1)) ? 0.5 : 1.0;
+    } else if (!useGrad) {
+      val = 0.0;
+    } else {
+      let t = coordinate[i];
+      if (t <= coreFrac) t = 0;
+      else t = (t - coreFrac) / (1 - coreFrac);
+      t = Math.max(0, Math.min(1, t));
+      val = applyFalloff(t, falloff);
+    }
+
+    if (dir === 'bright') val = 1.0 - val;
+
+    heightBuffer[i] = val;
+    let byte = Math.round(val * 255);
+    let p = i * 4;
+    data[p] = byte;
+    data[p + 1] = byte;
+    data[p + 2] = byte;
+    data[p + 3] = 255;
+  }
+}
+
+function draw2D() {
+  ctx.putImageData(imgData, 0, 0);
+  if ($('markers').checked) {
+    let isBrightCore = $('direction').value === 'bright';
+    ctx.fillStyle = isBrightCore ? '#000000' : '#ffffff';
+    for (let r of regions) {
+      if (!r.visible) continue;
+      ctx.beginPath();
+      ctx.arc(r.x + 0.5, r.y + 0.5, 2.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+}
+
+function refreshViews(isFinal = true) {
+  draw2D();
+  if (currentView === '3d') {
+    update3DPreview(isFinal ? 300 : 128);
+  }
+}
+
+function startProgressive(scrubbing = false) {
+  jobId++;
+  const myJob = jobId;
+  clearTimeout(stageTimer);
+
+  const stagesToRun = scrubbing ? [128, 256] : STAGES;
+  let idx = 0;
+
+  function nextStage() {
+    if (myJob !== jobId) return;
+    const res = stagesToRun[idx];
+    const t0 = performance.now();
+
+    computeStage(res);
+    const isLast = (idx === stagesToRun.length - 1);
+    const pct = Math.round(((idx + 1) / stagesToRun.length) * 100);
+    const dt = Math.round(performance.now() - t0);
+
+    setProgress(
+      isLast && !scrubbing ? 100 : pct * 0.92,
+      isLast && !scrubbing
+        ? `1024 Ã— 1024 â€¢ ${regions.length} cells â€¢ ${dt} ms`
+        : `Refining preview: ${res} Ã— ${res} (${regions.length} cells)â€¦`
+    );
+
+    refreshViews(isLast && !scrubbing);
+
+    idx++;
+    if (idx < stagesToRun.length) {
+      stageTimer = setTimeout(nextStage, 12);
+    }
+  }
+
+  nextStage();
+}
+
+// ============================================================================
+// SHARED HEIGHTMAP PROCESSING (Smoothing + Frame)
+// ============================================================================
+function buildProcessedGrid(res) {
+  const sizeMM = Math.max(1, parseFloat($('stlSize').value) || 100);
+  const baseMM = Math.max(0.1, parseFloat($('stlBase').value) || 2);
+  const reliefMM = Math.max(0, parseFloat($('stlHeight').value) || 4.5);
+  const smoothPasses = parseInt($('stlSmooth').value, 10) || 0;
+  const frameType = $('frameType').value;
+  const frameWidthMM = Math.max(0, parseFloat($('frameWidth').value) || 0);
+
+  let grid = new Float32Array(res * res);
+  const ratio = N / res;
+
+  for (let gy = 0; gy < res; gy++) {
+    const y0 = Math.floor(gy * ratio);
+    const y1 = Math.min(N, Math.max(y0 + 1, Math.floor((gy + 1) * ratio)));
+    for (let gx = 0; gx < res; gx++) {
+      const x0 = Math.floor(gx * ratio);
+      const x1 = Math.min(N, Math.max(x0 + 1, Math.floor((gx + 1) * ratio)));
+      let sum = 0, cnt = 0;
+      for (let sy = y0; sy < y1; sy++) {
+        const rowOff = sy * N;
+        for (let sx = x0; sx < x1; sx++) {
+          sum += heightBuffer[rowOff + sx];
+          cnt++;
+        }
+      }
+      grid[gy * res + gx] = cnt > 0 ? (sum / cnt) : 0;
+    }
+  }
+
+  if (smoothPasses > 0) {
+    let temp = new Float32Array(res * res);
+    for (let p = 0; p < smoothPasses; p++) {
+      for (let y = 0; y < res; y++) {
+        const row = y * res;
+        for (let x = 0; x < res; x++) {
+          const xm = x > 0 ? x - 1 : x;
+          const xp = x < res - 1 ? x + 1 : x;
+          temp[row + x] = (grid[row + xm] + 2 * grid[row + x] + grid[row + xp]) * 0.25;
+        }
+      }
+      for (let y = 0; y < res; y++) {
+        const ym = y > 0 ? y - 1 : y;
+        const yp = y < res - 1 ? y + 1 : y;
+        const r0 = ym * res, r1 = y * res, r2 = yp * res;
+        for (let x = 0; x < res; x++) {
+          grid[r1 + x] = (temp[r0 + x] + 2 * temp[r1 + x] + temp[r2 + x]) * 0.25;
+        }
+      }
+    }
+  }
+
+  if (frameType !== 'none' && frameWidthMM > 0) {
+    const targetNorm = (frameType === 'raised') ? 1.0 : 0.0;
+    const bevelMM = Math.min(1.5, frameWidthMM * 0.35);
+    const scaleMM = sizeMM / (res - 1);
+
+    for (let gy = 0; gy < res; gy++) {
+      const distY = Math.min(gy, res - 1 - gy) * scaleMM;
+      for (let gx = 0; gx < res; gx++) {
+        const distX = Math.min(gx, res - 1 - gx) * scaleMM;
+        const edgeDist = Math.min(distX, distY);
+        if (edgeDist < frameWidthMM) {
+          grid[gy * res + gx] = targetNorm;
+        } else if (edgeDist < frameWidthMM + bevelMM) {
+          let t = (edgeDist - frameWidthMM) / bevelMM;
+          t = t * t * (3 - 2 * t);
+          const idx = gy * res + gx;
+          grid[idx] = targetNorm * (1 - t) + grid[idx] * t;
+        }
+      }
+    }
+  }
+
+  for (let i = 0; i < grid.length; i++) {
+    grid[i] = baseMM + grid[i] * reliefMM;
+  }
+
+  lastPreviewGrid = grid;
+  lastPreviewRes = res;
+  return { grid, res, sizeMM, baseMM, reliefMM };
+}
+
+// ============================================================================
+// WEBGL 3D PLYWOOD CNC PREVIEW
+// ============================================================================
+const glCanvas = $('glCanvas');
+let gl = null, glProg = null, glPosBuf = null, glNormBuf = null, glIdxBuf = null;
+let glIndexCount = 0, glReady = false, glHasUint32 = false;
+let camYaw = 0.58, camPitch = 0.72, camZoom = 1.48, camPanX = 0, camPanY = 0;
+let dragMode = null, lastMouseX = 0, lastMouseY = 0;
+
+function initWebGL() {
+  if (glReady) return true;
+  gl = glCanvas.getContext('webgl', { antialias: true }) || glCanvas.getContext('experimental-webgl', { antialias: true });
+  if (!gl) {
+    $('error').textContent = 'WebGL is unavailable in this browser.';
+    return false;
+  }
+
+  glHasUint32 = !!gl.getExtension('OES_element_index_uint');
+
+  const vsSrc = `
+    attribute vec3 aPos;
+    attribute vec3 aNorm;
+    uniform mat4 uMVP;
+    varying vec3 vNorm;
+    varying vec3 vPos;
+    void main() {
+      vPos = aPos;
+      vNorm = aNorm;
+      gl_Position = uMVP * vec4(aPos, 1.0);
+    }
+  `;
+
+  const fsSrc = `
+    precision mediump float;
+    varying vec3 vNorm;
+    varying vec3 vPos;
+    uniform vec3 uLightDir;
+    uniform float uBaseZ;
+    uniform float uTotalZ;
+    uniform float uLayers;
+    uniform int uStyle;
+
+    float hash21(vec2 p) {
+      p = fract(p * vec2(123.34, 456.21));
+      p += dot(p, p + 45.32);
+      return fract(p.x * p.y);
+    }
+
+    float vnoise(vec2 p) {
+      vec2 i = floor(p);
+      vec2 f = fract(p);
+      f = f * f * (3.0 - 2.0 * f);
+      float a = hash21(i);
+      float b = hash21(i + vec2(1.0, 0.0));
+      float c = hash21(i + vec2(0.0, 1.0));
+      float d = hash21(i + vec2(1.0, 1.0));
+      return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+    }
+
+    vec3 getLayerColor(float layerIdx, int style, float grain) {
+      float m = mod(floor(layerIdx + 0.001), 6.0);
+      float alt = mod(floor(layerIdx + 0.001), 2.0);
+      if (style == 0) {
+        vec3 c1 = vec3(0.89, 0.77, 0.60);
+        vec3 c2 = vec3(0.75, 0.59, 0.41);
+        return mix(c1, c2, alt) * (0.91 + 0.16 * grain);
+      } else if (style == 1) {
+        vec3 maple = vec3(0.91, 0.81, 0.65);
+        vec3 walnut = vec3(0.32, 0.19, 0.12);
+        return mix(walnut, maple, alt) * (0.88 + 0.20 * grain);
+      } else if (style == 2) {
+        vec3 col = vec3(0.88, 0.78, 0.62);
+        if (m < 0.5) col = vec3(0.14, 0.52, 0.56);
+        else if (m < 1.5) col = vec3(0.88, 0.78, 0.62);
+        else if (m < 2.5) col = vec3(0.78, 0.31, 0.21);
+        else if (m < 3.5) col = vec3(0.18, 0.26, 0.45);
+        else if (m < 4.5) col = vec3(0.84, 0.63, 0.22);
+        return col * (0.90 + 0.18 * grain);
+      }
+      return vec3(0.76, 0.81, 0.85);
+    }
+
+    void main() {
+      vec3 n = normalize(vNorm);
+      float diff = max(dot(n, normalize(uLightDir)), 0.0);
+      float fill = max(dot(n, normalize(vec3(-0.6, -0.4, 0.7))), 0.0) * 0.25;
+
+      vec3 albedo;
+      if (uStyle == 3) {
+        albedo = vec3(0.76, 0.81, 0.85);
+      } else {
+        float wobble = (vnoise(vPos.xy * 6.0) - 0.5) * 0.14;
+        float normZ = clamp(vPos.z / max(uTotalZ, 0.001), 0.0, 0.9999);
+        float layerPos = normZ * uLayers + wobble;
+        float layerIdx = floor(layerPos);
+        float fracLayer = fract(layerPos);
+
+        float alt = mod(layerIdx, 2.0);
+        vec2 gCoord = (alt < 0.5)
+          ? vec2(vPos.x * 16.0, vPos.y * 130.0)
+          : vec2(vPos.x * 130.0, vPos.y * 16.0);
+        float grain = vnoise(gCoord + layerIdx * 13.7);
+
+        vec3 wood = getLayerColor(layerIdx, uStyle, grain);
+        float glueDist = min(fracLayer, 1.0 - fracLayer);
+        float slope = 1.0 - clamp(n.z, 0.0, 1.0);
+        float glueMask = smoothstep(0.085, 0.015, glueDist) * smoothstep(0.03, 0.25, slope);
+        vec3 glueCol = vec3(0.16, 0.09, 0.05);
+        albedo = mix(wood, glueCol, glueMask * 0.85);
+      }
+
+      vec3 lit = albedo * (0.28 + 0.72 * diff + fill);
+      gl_FragColor = vec4(lit, 1.0);
+    }
+  `;
+
+  function compile(type, src) {
+    const s = gl.createShader(type);
+    gl.shaderSource(s, src);
+    gl.compileShader(s);
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
+      const log = gl.getShaderInfoLog(s);
+      $('error').textContent = 'WebGL Shader error: ' + log;
+      gl.deleteShader(s);
+      return null;
+    }
+    return s;
+  }
+
+  const vs = compile(gl.VERTEX_SHADER, vsSrc);
+  const fs = compile(gl.FRAGMENT_SHADER, fsSrc);
+  if (!vs || !fs) return false;
+
+  glProg = gl.createProgram();
+  gl.attachShader(glProg, vs);
+  gl.attachShader(glProg, fs);
+  gl.linkProgram(glProg);
+  if (!gl.getProgramParameter(glProg, gl.LINK_STATUS)) {
+    const log = gl.getProgramInfoLog(glProg);
+    $('error').textContent = 'WebGL Program link error: ' + log;
+    gl.deleteProgram(glProg);
+    glProg = null;
+    return false;
+  }
+
+  glPosBuf = gl.createBuffer();
+  glNormBuf = gl.createBuffer();
+  glIdxBuf = gl.createBuffer();
+
+  gl.enable(gl.DEPTH_TEST);
+  glReady = true;
+  return true;
+}
+
+function update3DPreview(targetRes = 300) {
+  if (!initWebGL() || !glProg) return;
+  const maxRes = glHasUint32 ? targetRes : Math.min(250, targetRes);
+  const { grid, res, sizeMM, baseMM, reliefMM } = buildProcessedGrid(maxRes);
+
+  const vCount = res * res;
+  const positions = new Float32Array(vCount * 3);
+  const normals = new Float32Array(vCount * 3);
+
+  const xyScale = 1.0 / (res - 1);
+  const zScale = 1.0 / sizeMM;
+
+  for (let y = 0; y < res; y++) {
+    const py = (0.5 - y * xyScale);
+    for (let x = 0; x < res; x++) {
+      const idx = y * res + x;
+      const p3 = idx * 3;
+      positions[p3] = (x * xyScale - 0.5);
+      positions[p3 + 1] = py;
+      positions[p3 + 2] = grid[idx] * zScale;
+    }
+  }
+
+  const cellMM = sizeMM / (res - 1);
+  for (let y = 0; y < res; y++) {
+    const ym = y > 0 ? y - 1 : y;
+    const yp = y < res - 1 ? y + 1 : y;
+    for (let x = 0; x < res; x++) {
+      const xm = x > 0 ? x - 1 : x;
+      const xp = x < res - 1 ? x + 1 : x;
+      const dzdx = (grid[y * res + xp] - grid[y * res + xm]) / ((xp - xm) * cellMM || 1);
+      const dzdy = (grid[ym * res + x] - grid[yp * res + x]) / ((yp - ym) * cellMM || 1);
+      let nx = -dzdx, ny = -dzdy, nz = 1.0;
+      const len = Math.hypot(nx, ny, nz) || 1;
+      const p3 = (y * res + x) * 3;
+      normals[p3] = nx / len;
+      normals[p3 + 1] = ny / len;
+      normals[p3 + 2] = nz / len;
+    }
+  }
+
+  const quadCount = (res - 1) * (res - 1);
+  glIndexCount = quadCount * 6;
+  const indices = glHasUint32 ? new Uint32Array(glIndexCount) : new Uint16Array(glIndexCount);
+  let ptr = 0;
+  for (let y = 0; y < res - 1; y++) {
+    for (let x = 0; x < res - 1; x++) {
+      const i0 = y * res + x;
+      const i1 = i0 + 1;
+      const i2 = i0 + res;
+      const i3 = i2 + 1;
+      indices[ptr++] = i0; indices[ptr++] = i2; indices[ptr++] = i1;
+      indices[ptr++] = i1; indices[ptr++] = i2; indices[ptr++] = i3;
+    }
+  }
+
+  gl.bindBuffer(gl.ARRAY_BUFFER, glPosBuf);
+  gl.bufferData(gl.ARRAY_BUFFER, positions, gl.STATIC_DRAW);
+
+  gl.bindBuffer(gl.ARRAY_BUFFER, glNormBuf);
+  gl.bufferData(gl.ARRAY_BUFFER, normals, gl.STATIC_DRAW);
+
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, glIdxBuf);
+  gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indices, gl.STATIC_DRAW);
+
+  gl.useProgram(glProg);
+  gl.uniform1f(gl.getUniformLocation(glProg, 'uBaseZ'), baseMM * zScale);
+  gl.uniform1f(gl.getUniformLocation(glProg, 'uTotalZ'), Math.max(0.001, (baseMM + reliefMM) * zScale));
+
+  render3D();
+}
+
+function mat4Multiply(a, b) {
+  const out = new Float32Array(16);
+  for (let c = 0; c < 4; c++) {
+    for (let r = 0; r < 4; r++) {
+      out[c * 4 + r] =
+        a[0 * 4 + r] * b[c * 4 + 0] +
+        a[1 * 4 + r] * b[c * 4 + 1] +
+        a[2 * 4 + r] * b[c * 4 + 2] +
+        a[3 * 4 + r] * b[c * 4 + 3];
+    }
+  }
+  return out;
+}
+
+function render3D() {
+  if (!glReady || !glProg || currentView !== '3d' || glIndexCount === 0) return;
+
+  const rect = glCanvas.getBoundingClientRect();
+  if (rect.width === 0 || rect.height === 0) {
+    requestAnimationFrame(render3D);
+    return;
+  }
+
+  const dpr = window.devicePixelRatio || 1;
+  const w = Math.max(1, Math.round(rect.width * dpr));
+  const h = Math.max(1, Math.round(rect.height * dpr));
+  if (glCanvas.width !== w || glCanvas.height !== h) {
+    glCanvas.width = w;
+    glCanvas.height = h;
+  }
+
+  gl.viewport(0, 0, w, h);
+  gl.clearColor(0.04, 0.07, 0.11, 1.0);
+  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+  gl.useProgram(glProg);
+
+  const styleMap = { birch: 0, walnut: 1, spectra: 2, solid: 3 };
+  gl.uniform1i(gl.getUniformLocation(glProg, 'uStyle'), styleMap[$('plyStyle').value] || 0);
+  gl.uniform1f(gl.getUniformLocation(glProg, 'uLayers'), parseFloat($('plyLayers').value) || 11);
+
+  const aspect = w / h;
+  const fov = Math.PI / 4;
+  const f = 1.0 / Math.tan(fov / 2);
+  const near = 0.05, far = 20.0;
+  const proj = new Float32Array([
+    f / aspect, 0, 0, 0,
+    0, f, 0, 0,
+    0, 0, (far + near) / (near - far), -1,
+    0, 0, (2 * far * near) / (near - far), 0
+  ]);
+
+  const cz = Math.cos(camYaw), sz = Math.sin(camYaw);
+  const cx = Math.cos(camPitch), sx = Math.sin(camPitch);
+
+  const rotZ = new Float32Array([
+    cz, sz, 0, 0,
+    -sz, cz, 0, 0,
+    0, 0, 1, 0,
+    0, 0, 0, 1
+  ]);
+  const rotX = new Float32Array([
+    1, 0, 0, 0,
+    0, cx, -sx, 0,
+    0, sx, cx, 0,
+    0, 0, 0, 1
+  ]);
+  const trans = new Float32Array([
+    1, 0, 0, 0,
+    0, 1, 0, 0,
+    0, 0, 1, 0,
+    camPanX, camPanY, -camZoom, 1
+  ]);
+
+  const mvp = mat4Multiply(proj, mat4Multiply(trans, mat4Multiply(rotX, rotZ)));
+  gl.uniformMatrix4fv(gl.getUniformLocation(glProg, 'uMVP'), false, mvp);
+  gl.uniform3f(gl.getUniformLocation(glProg, 'uLightDir'), 0.55, 0.45, 0.85);
+
+  const aPos = gl.getAttribLocation(glProg, 'aPos');
+  gl.bindBuffer(gl.ARRAY_BUFFER, glPosBuf);
+  gl.enableVertexAttribArray(aPos);
+  gl.vertexAttribPointer(aPos, 3, gl.FLOAT, false, 0, 0);
+
+  const aNorm = gl.getAttribLocation(glProg, 'aNorm');
+  gl.bindBuffer(gl.ARRAY_BUFFER, glNormBuf);
+  gl.enableVertexAttribArray(aNorm);
+  gl.vertexAttribPointer(aNorm, 3, gl.FLOAT, false, 0, 0);
+
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, glIdxBuf);
+  gl.drawElements(gl.TRIANGLES, glIndexCount, glHasUint32 ? gl.UNSIGNED_INT : gl.UNSIGNED_SHORT, 0);
+}
+
+// Mouse navigation for 3D preview
+glCanvas.addEventListener('contextmenu', e => e.preventDefault());
+glCanvas.addEventListener('mousedown', e => {
+  dragMode = (e.button === 2 || e.shiftKey) ? 'pan' : 'rotate';
+  lastMouseX = e.clientX;
+  lastMouseY = e.clientY;
+});
+window.addEventListener('mouseup', () => { dragMode = null; });
+window.addEventListener('mousemove', e => {
+  if (!dragMode) return;
+  const dx = e.clientX - lastMouseX;
+  const dy = e.clientY - lastMouseY;
+  lastMouseX = e.clientX;
+  lastMouseY = e.clientY;
+  if (dragMode === 'rotate') {
+    camYaw += dx * 0.008;
+    camPitch = Math.max(0.05, Math.min(Math.PI * 0.49, camPitch + dy * 0.008));
+  } else {
+    camPanX += dx * 0.0015 * camZoom;
+    camPanY -= dy * 0.0015 * camZoom;
+  }
+  render3D();
+});
+glCanvas.addEventListener('wheel', e => {
+  e.preventDefault();
+  camZoom = Math.max(0.35, Math.min(4.5, camZoom * (e.deltaY > 0 ? 1.08 : 0.92)));
+  render3D();
+}, { passive: false });
+window.addEventListener('resize', render3D);
+
+// ============================================================================
+// WATERPROOF BINARY STL EXPORT
+// ============================================================================
+function exportSTL() {
+  setProgress(10, 'Generating smoothed & framed STL meshâ€¦');
+  setTimeout(() => {
+    try {
+      const res = parseInt($('stlRes').value, 10);
+      const { grid: zGrid, sizeMM } = buildProcessedGrid(res);
+
+      setProgress(55, 'Encoding binary STL trianglesâ€¦');
+
+      const topTris = 2 * (res - 1) * (res - 1);
+      const botTris = topTris;
+      const sideTris = 4 * ((res - 1) + (res - 1));
+      const totalTris = topTris + botTris + sideTris;
+
+      const buffer = new ArrayBuffer(84 + totalTris * 50);
+      const view = new DataView(buffer);
+
+      const header = 'Binary STL generated by Cell Studio';
+      for (let i = 0; i < header.length; i++) view.setUint8(i, header.charCodeAt(i));
+      view.setUint32(80, totalTris, true);
+
+      let offset = 84;
+      const scaleXY = sizeMM / (res - 1);
+
+      function writeTri(x1, y1, z1, x2, y2, z2, x3, y3, z3) {
+        const ux = x2 - x1, uy = y2 - y1, uz = z2 - z1;
+        const vx = x3 - x1, vy = y3 - y1, vz = z3 - z1;
+        let nx = uy * vz - uz * vy;
+        let ny = uz * vx - ux * vz;
+        let nz = ux * vy - uy * vx;
+        const len = Math.hypot(nx, ny, nz) || 1;
+        nx /= len; ny /= len; nz /= len;
+
+        view.setFloat32(offset, nx, true); offset += 4;
+        view.setFloat32(offset, ny, true); offset += 4;
+        view.setFloat32(offset, nz, true); offset += 4;
+
+        view.setFloat32(offset, x1, true); offset += 4;
+        view.setFloat32(offset, y1, true); offset += 4;
+        view.setFloat32(offset, z1, true); offset += 4;
+
+        view.setFloat32(offset, x2, true); offset += 4;
+        view.setFloat32(offset, y2, true); offset += 4;
+        view.setFloat32(offset, z2, true); offset += 4;
+
+        view.setFloat32(offset, x3, true); offset += 4;
+        view.setFloat32(offset, y3, true); offset += 4;
+        view.setFloat32(offset, z3, true); offset += 4;
+
+        view.setUint16(offset, 0, true); offset += 2;
+      }
+
+      for (let gy = 0; gy < res - 1; gy++) {
+        const y0 = (res - 1 - gy) * scaleXY;
+        const y1 = (res - 2 - gy) * scaleXY;
+        for (let gx = 0; gx < res - 1; gx++) {
+          const x0 = gx * scaleXY, x1 = (gx + 1) * scaleXY;
+          const z00 = zGrid[gy * res + gx];
+          const z10 = zGrid[gy * res + gx + 1];
+          const z01 = zGrid[(gy + 1) * res + gx];
+          const z11 = zGrid[(gy + 1) * res + gx + 1];
+
+          writeTri(x0, y0, z00, x1, y0, z10, x1, y1, z11);
+          writeTri(x0, y0, z00, x1, y1, z11, x0, y1, z01);
+        }
+      }
+
+      for (let gy = 0; gy < res - 1; gy++) {
+        const y0 = (res - 1 - gy) * scaleXY;
+        const y1 = (res - 2 - gy) * scaleXY;
+        for (let gx = 0; gx < res - 1; gx++) {
+          const x0 = gx * scaleXY, x1 = (gx + 1) * scaleXY;
+          writeTri(x0, y0, 0, x1, y1, 0, x1, y0, 0);
+          writeTri(x0, y0, 0, x0, y1, 0, x1, y1, 0);
+        }
+      }
+
+      const yTop = (res - 1) * scaleXY;
+      for (let gx = 0; gx < res - 1; gx++) {
+        const x0 = gx * scaleXY, x1 = (gx + 1) * scaleXY;
+        const z0 = zGrid[gx], z1 = zGrid[gx + 1];
+        writeTri(x0, yTop, 0, x1, yTop, 0, x1, yTop, z1);
+        writeTri(x0, yTop, 0, x1, yTop, z1, x0, yTop, z0);
+      }
+      const rowBot = (res - 1) * res;
+      for (let gx = 0; gx < res - 1; gx++) {
+        const x0 = gx * scaleXY, x1 = (gx + 1) * scaleXY;
+        const z0 = zGrid[rowBot + gx], z1 = zGrid[rowBot + gx + 1];
+        writeTri(x0, 0, 0, x1, 0, z1, x1, 0, 0);
+        writeTri(x0, 0, 0, x0, 0, z0, x1, 0, z1);
+      }
+      for (let gy = 0; gy < res - 1; gy++) {
+        const y0 = (res - 1 - gy) * scaleXY, y1 = (res - 2 - gy) * scaleXY;
+        const z0 = zGrid[gy * res], z1 = zGrid[(gy + 1) * res];
+        writeTri(0, y0, 0, 0, y1, z1, 0, y1, 0);
+        writeTri(0, y0, 0, 0, y0, z0, 0, y1, z1);
+      }
+      const xRight = (res - 1) * scaleXY;
+      for (let gy = 0; gy < res - 1; gy++) {
+        const y0 = (res - 1 - gy) * scaleXY, y1 = (res - 2 - gy) * scaleXY;
+        const z0 = zGrid[gy * res + res - 1], z1 = zGrid[(gy + 1) * res + res - 1];
+        writeTri(xRight, y0, 0, xRight, y1, 0, xRight, y1, z1);
+        writeTri(xRight, y0, 0, xRight, y1, z1, xRight, y0, z0);
+      }
+
+      const blob = new Blob([buffer], { type: 'application/octet-stream' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `cell-studio-${$('seed').value}-${res}px.stl`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+
+      const mb = (buffer.byteLength / (1024 * 1024)).toFixed(1);
+      setProgress(100, `STL exported (${res}Ã—${res}, ${mb} MB)`);
+    } catch (e) {
+      $('error').textContent = e.stack || e;
+    }
+  }, 20);
+}
+
+// ============================================================================
+// UI EVENT HANDLERS
+// ============================================================================
+function switchView(view) {
+  currentView = view;
+  $('tab2d').classList.toggle('active', view === '2d');
+  $('tab3d').classList.toggle('active', view === '3d');
+  $('canvas2d').style.display = (view === '2d') ? 'block' : 'none';
+  $('glCanvas').style.display = (view === '3d') ? 'block' : 'none';
+  $('glHint').style.display = (view === '3d') ? 'block' : 'none';
+  if (view === '3d') {
+    requestAnimationFrame(() => update3DPreview(300));
+  }
+}
+
+$('tab2d').onclick = () => switchView('2d');
+$('tab3d').onclick = () => switchView('3d');
+
+$('seed').onchange = () => startProgressive(false);
+$('newSeed').onclick = () => {
+  $('seed').value = Math.floor(Math.random() * 900000) + 100000;
+  startProgressive(false);
+};
+
+$('direction').onchange = () => { shade(); refreshViews(true); };
+$('falloff').onchange = () => { shade(); refreshViews(true); };
+$('gradient').onchange = () => { shade(); refreshViews(true); };
+$('markers').onchange = () => { draw2D(); };
+$('bounds').onchange = () => { shade(); refreshViews(true); };
+$('showMembrane').onchange = () => {
+  $('membrane').disabled = !$('showMembrane').checked;
+  computeCoordinates();
+  shade();
+  refreshViews(true);
+};
+
+$('plyStyle').onchange = () => render3D();
+$('plyLayers').oninput = () => {
+  $('plyLayersOut').textContent = $('plyLayers').value;
+  render3D();
+};
+
+$('stlSmooth').oninput = () => {
+  $('stlSmoothOut').textContent = $('stlSmooth').value;
+  if (currentView === '3d') update3DPreview(220);
+};
+$('stlSmooth').onchange = () => {
+  if (currentView === '3d') update3DPreview(300);
+};
+['stlSize', 'stlBase', 'stlHeight', 'frameType', 'frameWidth'].forEach(id => {
+  $(id).onchange = () => { if (currentView === '3d') update3DPreview(300); };
+});
+
+$('exportStl').onclick = exportSTL;
+$('exportPng').onclick = () => {
+  let a = document.createElement('a');
+  a.href = c2d.toDataURL('image/png');
+  a.download = `cell-studio-${$('seed').value}.png`;
+  a.click();
+};
+$('full').onclick = () => {
+  if (!document.fullscreenElement) document.documentElement.requestFullscreen();
+  else document.exitFullscreen();
+};
+
+// Start directly in 3D view
+requestAnimationFrame(() => startProgressive(false));
+</script>
+</body>
+</html> 
